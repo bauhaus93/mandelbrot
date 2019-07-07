@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "mandelbrot_core",
-    "explorer"
+    "explorer",
+    "generator"
 ]

@@ -2,6 +2,7 @@ use palette;
 use palette::Pixel;
 use num::Complex;
 use rayon::iter::{ ParallelIterator, IntoParallelRefIterator };
+use histogram::Histogram;
 
 use crate::{ MandelbrotError, snapshot };
 
@@ -12,18 +13,39 @@ pub struct Mandelbrot {
 }
 
 impl Mandelbrot {
+    pub fn set_center(&mut self, new_center: [f64; 2]) {
+        self.center = new_center;
+    }
 
     pub fn move_center(&mut self, percent: [f64; 2], shape: [i32; 2]) {
         self.center[0] += self.step_size * percent[0] * shape[0] as f64;
         self.center[1] += self.step_size * percent[1] * shape[1] as f64;
+    }
+
+    pub fn set_step_size(&mut self, value: f64) {
+        self.step_size = value;
     }
     
     pub fn zoom(&mut self, factor: f64) {
         self.step_size *= factor;
     }
 
+    pub fn set_depth(&mut self, value: u32) {
+        self.depth = value;
+    }
+
     pub fn mod_depth(&mut self, value: u32) {
         self.depth += value;
+    }
+
+    pub fn get_center(&self) -> [f64; 2] {
+        self.center
+    }
+    pub fn get_step_size(&self) -> f64 {
+        self.step_size
+    }
+    pub fn get_depth(&self) -> u32 {
+        self.depth
     }
 
     pub fn print_stats(&self) {
@@ -32,6 +54,32 @@ impl Mandelbrot {
             self.center[1],
             self.step_size,
             self.depth);
+    }
+
+    pub fn estimate_entropy(&self, shape: [i32;2]) -> f32 {
+        const EST_SIZE: i32 = 10;
+        let mut histogram = Histogram::new();
+        for y in -EST_SIZE / 2..EST_SIZE / 2 {
+            for x in -EST_SIZE / 2..EST_SIZE / 2 {
+                let local_point = [x * shape[0] / EST_SIZE,
+                                   y * shape[1] / EST_SIZE];
+                let abs_point = self.pixel_to_absolute(local_point);
+                match check_mandelbrot(&abs_point, self.depth) {
+                    Some(v) => histogram.increment(v as u64 + 1).unwrap(),
+                    None => histogram.increment(0).unwrap()
+                }
+            }
+        }
+
+        let total = histogram.entries();
+        let mut entropy = 0.;
+        for bucket in histogram.into_iter() {
+            let prob = bucket.count() as f32 / total as f32;
+            if prob > 0. {
+                entropy += prob * prob.log2();
+            }
+        }
+        -entropy
     }
 
     pub fn snapshot(&self, file_name: &str, shape: [i32; 2]) -> Result<(), MandelbrotError> {
@@ -56,13 +104,17 @@ impl Mandelbrot {
         pixels
     }
 
+    fn pixel_to_absolute(&self, point: [i32; 2]) -> [f64; 2] {
+        [self.center[0] + self.step_size * point[0] as f64,
+         self.center[1] + self.step_size * point[1] as f64]
+    }
+
     fn create_values(&self, shape: [i32; 2]) -> (Vec<Option<u32>>, u32, u32) {
         let mut points: Vec<[f64; 2]> = Vec::new();
         for y in -shape[1] / 2..shape[1] / 2 {
             for x in -shape[0] / 2..shape[0] / 2 {
-                let point = [self.center[0] + self.step_size * x as f64,
-                             self.center[1] + self.step_size * y as f64];
-                points.push(point); 
+                let abs_point = self.pixel_to_absolute([x, y]);
+                points.push(abs_point); 
             }
         }
         let values: Vec<Option<u32>> = points.par_iter()

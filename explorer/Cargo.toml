@@ -10,6 +10,5 @@ mandelbrot_core = { path = "../mandelbrot_core" }
 log = "0.4"
 env_logger = "0.6"
 chrono = "0.4"
-num = "0.2"
 allegro = "0.0"
 allegro_primitives = "0.0"

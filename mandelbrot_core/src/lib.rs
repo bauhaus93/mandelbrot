@@ -5,6 +5,7 @@ extern crate num;
 extern crate rayon;
 extern crate palette;
 extern crate image;
+extern crate histogram;
 
 pub mod mandelbrot;
 pub mod mandelbrot_error;
