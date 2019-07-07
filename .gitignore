@@ -1,4 +1,6 @@
 /target/
+tags
+*.png
 *.rs.bk
 *.rs.swp
 Cargo.lock

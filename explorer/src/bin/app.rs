@@ -3,21 +3,21 @@ extern crate log;
 extern crate env_logger;
 extern crate chrono;
 
-extern crate mandelbrot;
+extern crate explorer;
 
 use std::io::Write;
 use log::Record;
 use env_logger::{ Builder };
 use env_logger::fmt::Formatter;
 
-use mandelbrot::application::Application;
+use explorer::Explorer;
 
 fn main() {
-    const WINDOW_SIZE: [i32; 2]= [400, 400];
+    const WINDOW_SIZE: [i32; 2]= [1024, 768];
     const UPDATE_FREQUENCY: i32 = 30;
     init_custom_logger();
 
-    match Application::new(WINDOW_SIZE, UPDATE_FREQUENCY) {
+    match Explorer::new(WINDOW_SIZE, UPDATE_FREQUENCY) {
         Ok(mut app) => {
             app.run();        
         },
