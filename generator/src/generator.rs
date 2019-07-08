@@ -59,7 +59,7 @@ impl Generator {
         let bucket_count = self.get_random_bucket_count();
         self.mandelbrot.set_center(pos);
         self.mandelbrot.set_step_size(step_size);
-        self.mandelbrot.randomize_continuos_color(bucket_count as usize);
+        self.mandelbrot.randomize_continuos_color_ranged(bucket_count as usize);
         let entropy = self.mandelbrot.estimate_entropy(self.snapshot_size);
         entropy
     }
@@ -69,12 +69,12 @@ impl Generator {
          self.rng.gen_range(-2., 2.)]
     }
     fn get_random_step_size(&mut self) -> f64 {
-        self.rng.gen_range(1e-12, 1e-8)
+        self.rng.gen_range(1e-14, 1e-4)
     }
     fn get_random_depth(&mut self) -> u32 {
         self.rng.gen_range(250, 750)
     }
     fn get_random_bucket_count(&mut self) -> u32 {
-        self.rng.gen_range(10, 500)
+        self.rng.gen_range(100, 500)
     }
 }

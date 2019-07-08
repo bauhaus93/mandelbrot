@@ -55,6 +55,11 @@ impl Mandelbrot {
         self.color_buckets = ColorBucket::create_random_continuos_list(count);
     }
 
+    pub fn randomize_continuos_color_ranged(&mut self, bucket_count: usize) {
+        let count = usize::min(bucket_count, self.depth as usize);
+        self.color_buckets = ColorBucket::create_random_continuos_list_ranged(count);
+    }
+
     pub fn randomize_color(&mut self, bucket_count: usize) {
         let count = usize::min(bucket_count, self.depth as usize);
         self.color_buckets = ColorBucket::create_random_list(count);
@@ -188,7 +193,7 @@ impl Default for Mandelbrot {
             step_size: 1. / 800.,
             center: [0.5, 0.],
             depth: 255,
-            color_buckets: ColorBucket::create_continuos_list(0., 255)
+            color_buckets: ColorBucket::create_continuos_list(0., (0., 1.), 255)
         }
     }
 }

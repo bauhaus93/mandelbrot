@@ -19,14 +19,22 @@ impl ColorBucket {
         }
     }
 
-    pub fn create_continuos_list(start_hue: f32, bucket_count: usize) -> Vec<ColorBucket> {
-        let hue_step = 1. / bucket_count as f32;
+    pub fn create_continuos_list(start_hue: f32, hue_range: (f32, f32), bucket_count: usize) -> Vec<ColorBucket> {
+        let mut rng = thread_rng();
+        let range_size = hue_range.1 - hue_range.0;
+        let mut hue = start_hue;
+        let hue_step = range_size / bucket_count as f32;
+        let mut hue_sig = 1.;
         let mut buckets = Vec::new();
         for i in 0..bucket_count {
-            let hue = match start_hue + hue_step * i as f32 {
-                hue if hue > 1. => hue - 1.,
-                hue => hue
-            };
+            hue += hue_step * hue_sig;
+            if hue > hue_range.1 {
+                hue = hue_range.1;
+                hue_sig *= -1.;
+            } else if hue < hue_range.0 {
+                hue = hue_range.0;
+                hue_sig *= -1.;
+            }
             let b = ColorBucket::from_hsv(hue, 1., 1.);
             buckets.push(b);
         }
@@ -35,8 +43,17 @@ impl ColorBucket {
 
     pub fn create_random_continuos_list(bucket_count: usize) -> Vec<ColorBucket> {
         let start = thread_rng().gen_range(0., 1.);
-        Self::create_continuos_list(start, bucket_count)
+        Self::create_continuos_list(start, (0., 1.), bucket_count)
     }
+
+    pub fn create_random_continuos_list_ranged(bucket_count: usize) -> Vec<ColorBucket> {
+        let mut rng = thread_rng();
+        let min_hue = rng.gen_range(0., 0.1);
+        let max_hue = rng.gen_range(min_hue + 0.2, 0.9);
+        let start = rng.gen_range(min_hue, max_hue);
+        Self::create_continuos_list(start, (min_hue, max_hue), bucket_count)
+    }
+
 
     pub fn create_random_list(bucket_count: usize) -> Vec<ColorBucket> {
         let mut rng = thread_rng();

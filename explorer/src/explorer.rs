@@ -17,6 +17,7 @@ pub struct Explorer {
     primitives: PrimitivesAddon,
     display: Display,
     core: Core,
+    color_count: usize
 }
 
 impl Explorer {
@@ -58,6 +59,7 @@ impl Explorer {
         event_queue.register_event_source(update_timer.get_event_source());
 
         let mut mandelbrot = Mandelbrot::default();
+        mandelbrot.randomize_continuos_color(100);
         let app = Self {
             stop: false,
             needs_update: true,
@@ -67,7 +69,8 @@ impl Explorer {
             event_queue: event_queue,
             primitives: primitives_addon,
             display: display,
-            core: core
+            core: core,
+            color_count: 100
         };
         Ok(app)
     }
@@ -134,6 +137,13 @@ impl Explorer {
                     Ok(_) => info!("Finished snapshot!"),
                     Err(e) => error!("Snapshot: {}", e)
                 }
+            },
+            allegro::KeyCode::F2 => {
+                self.mandelbrot.randomize_continuos_color_ranged(self.color_count);
+                self.needs_update = true;
+            },
+            allegro::KeyCode::Escape => {
+                self.stop = true;
             },
             _ => {}
         }
