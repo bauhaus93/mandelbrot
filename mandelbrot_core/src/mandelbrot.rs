@@ -1,18 +1,20 @@
 use palette;
 use palette::Pixel;
 use num::Complex;
-use rayon::iter::{ ParallelIterator, IntoParallelRefIterator };
+use rayon::iter::{ ParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator };
 use histogram::Histogram;
 
-use crate::{ MandelbrotError, snapshot };
+use crate::{ MandelbrotError, ColorBucket, snapshot };
 
 pub struct Mandelbrot {
     step_size: f64,
     center: [f64; 2],
-    depth: u32
+    depth: u32,
+    color_buckets: Vec<ColorBucket>
 }
 
 impl Mandelbrot {
+
     pub fn set_center(&mut self, new_center: [f64; 2]) {
         self.center = new_center;
     }
@@ -46,6 +48,20 @@ impl Mandelbrot {
     }
     pub fn get_depth(&self) -> u32 {
         self.depth
+    }
+
+    pub fn randomize_continuos_color(&mut self, bucket_count: usize) {
+        let count = usize::min(bucket_count, self.depth as usize);
+        self.color_buckets = ColorBucket::create_random_continuos_list(count);
+    }
+
+    pub fn randomize_color(&mut self, bucket_count: usize) {
+        let count = usize::min(bucket_count, self.depth as usize);
+        self.color_buckets = ColorBucket::create_random_list(count);
+    }
+
+    pub fn randomize_color_alternating(&mut self, color_count: usize) {
+        self.color_buckets = ColorBucket::create_random_alternating_list(self.depth as usize, color_count);
     }
 
     pub fn print_stats(&self) {
@@ -88,17 +104,17 @@ impl Mandelbrot {
     }
 
     pub fn create_pixel_triplets(&self, shape: [i32; 2]) -> Vec<[u8; 3]> {
-       let (values, min, max) = self.create_values(shape); 
+       let values = self.create_values(shape);
         values.par_iter()
-            .map(|v| colorize(*v, min, max))
+            .map(|v| colorize(*v, &self.color_buckets))
             .collect()
     }
 
     pub fn create_pixels(&self, shape: [i32; 2]) -> Vec<u8> {
-        let (values, min, max) = self.create_values(shape);
+        let values = self.create_values(shape);
         let mut pixels = Vec::new();
         for v in values.iter() {
-            let rgb_triple = colorize(*v, min, max);
+            let rgb_triple = colorize(*v, &self.color_buckets);
             pixels.extend_from_slice(&rgb_triple);
         }
         pixels
@@ -109,7 +125,7 @@ impl Mandelbrot {
          self.center[1] + self.step_size * point[1] as f64]
     }
 
-    fn create_values(&self, shape: [i32; 2]) -> (Vec<Option<u32>>, u32, u32) {
+    fn create_values(&self, shape: [i32; 2]) -> Vec<Option<u32>> {
         let mut points: Vec<[f64; 2]> = Vec::new();
         for y in -shape[1] / 2..shape[1] / 2 {
             for x in -shape[0] / 2..shape[0] / 2 {
@@ -117,7 +133,7 @@ impl Mandelbrot {
                 points.push(abs_point); 
             }
         }
-        let values: Vec<Option<u32>> = points.par_iter()
+        let mut values: Vec<Option<u32>> = points.par_iter()
             .map(|p| check_mandelbrot(p, self.depth))
             .collect();
         let min = values.iter().fold(u32::max_value(), |curr_min, v| match v {
@@ -129,18 +145,25 @@ impl Mandelbrot {
                 Some(n) => u32::max(curr_max, *n),
                 None => curr_max
         });
-        (values, min, max)
+        let bucket_modifier = if min == max {
+            1
+        } else {
+            u32::max(1, (max - min) / u32::min(self.color_buckets.len() as u32, self.depth))
+        };
+        values.par_iter_mut()
+            .for_each(|v| match v {
+                Some(v) => *v =  (*v / bucket_modifier) % self.color_buckets.len() as u32,
+                None => {}
+            });
+        values
     }
 
 }
 
-fn colorize(value: Option<u32>, min: u32, max: u32) -> [u8; 3] {
+fn colorize(value: Option<u32>, color_buckets: &[ColorBucket]) -> [u8; 3] {
     match value {
         Some(v) => {
-            let perc = (v - min) as f32 / max as f32;
-            let hue = 360. * perc;
-            let rgb_f: [f32; 3] = palette::Srgb::from(palette::Hsv::new(hue, 1., 1.)).into_raw();
-            [(rgb_f[0] * 255.) as u8, (rgb_f[1] * 255.) as u8, (rgb_f[2] * 255.) as u8]
+            color_buckets[v as usize].get_color()
         },
         None => [0, 0, 0]
     }
@@ -164,7 +187,8 @@ impl Default for Mandelbrot {
         Self {
             step_size: 1. / 800.,
             center: [0.5, 0.],
-            depth: 255
+            depth: 255,
+            color_buckets: ColorBucket::create_continuos_list(0., 255)
         }
     }
 }

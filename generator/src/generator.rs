@@ -16,7 +16,7 @@ pub struct Generator {
 impl Generator {
     pub fn new(snapshot_size: [i32; 2], entropy_threshold: f32) -> Result<Generator, GeneratorError> {
         let mut mandelbrot = Mandelbrot::default();
-        mandelbrot.set_depth(600);
+        mandelbrot.set_depth(400);
         let generator = Self {
             snapshot_size: snapshot_size,
             entropy_threshold: entropy_threshold,
@@ -56,16 +56,13 @@ impl Generator {
     fn randomize_mandelbrot(&mut self) -> f32 {
         let pos = self.get_random_pos();
         let step_size = self.get_random_step_size();
-        let depth = self.get_random_depth();
+        let bucket_count = self.get_random_bucket_count();
         self.mandelbrot.set_center(pos);
         self.mandelbrot.set_step_size(step_size);
-        self.mandelbrot.set_depth(depth);
+        self.mandelbrot.randomize_continuos_color(bucket_count as usize);
         let entropy = self.mandelbrot.estimate_entropy(self.snapshot_size);
-        trace!("center = {}/{}, step size = {}, depth = {}, entropy = {}",
-            pos[0], pos[1], step_size, depth, entropy);
         entropy
     }
-  
 
     fn get_random_pos(&mut self) -> [f64; 2] {
         [self.rng.gen_range(-2., 2.),
@@ -76,5 +73,8 @@ impl Generator {
     }
     fn get_random_depth(&mut self) -> u32 {
         self.rng.gen_range(250, 750)
+    }
+    fn get_random_bucket_count(&mut self) -> u32 {
+        self.rng.gen_range(10, 500)
     }
 }
