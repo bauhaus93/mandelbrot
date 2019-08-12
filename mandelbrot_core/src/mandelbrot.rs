@@ -24,6 +24,11 @@ impl Mandelbrot {
         self.center[1] += self.step_size * percent[1] * shape[1] as f64;
     }
 
+    pub fn move_center_units(&mut self, units: [i32; 2]) {
+        self.center[0] += self.step_size * units[0] as f64;
+        self.center[1] += self.step_size * units[1] as f64;
+    }
+
     pub fn set_step_size(&mut self, value: f64) {
         self.step_size = value;
     }
