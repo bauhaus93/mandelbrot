@@ -1,8 +1,8 @@
 use std::fs::File;
 
+use chrono::Local;
 use image::png::PNGEncoder;
 use image::ColorType;
-use chrono::Local;
 
 use crate::MandelbrotError;
 

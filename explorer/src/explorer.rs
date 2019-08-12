@@ -161,16 +161,16 @@ impl Explorer {
                 info!("Starting zoomed sequence...");
                 match self
                     .mandelbrot
-                    .snapshot_sequence_zoomed(1000, [800, 600], 0.99, "seq_")
+                    .snapshot_sequence_zoomed(10000, [800, 600], 0.99, "seq_")
                 {
                     Ok(_) => info!("Finished zoomed sequence"),
                     Err(e) => error!("Zoomed sequence: {}", e),
                 }
-            },
+            }
             allegro::KeyCode::F3 => {
                 self.mandelbrot.randomize_start_color();
                 self.needs_update = true;
-            },
+            }
             allegro::KeyCode::F4 => {
                 self.mandelbrot.set_step_default();
                 self.needs_update = true;

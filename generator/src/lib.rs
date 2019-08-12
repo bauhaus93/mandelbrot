@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 extern crate chrono;
+extern crate env_logger;
 extern crate rand;
 
 extern crate mandelbrot_core;

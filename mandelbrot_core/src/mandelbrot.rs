@@ -199,7 +199,7 @@ impl Default for Mandelbrot {
             center: DEFAULT_POS,
             depth: 400,
             color_loop_depth: DEFAULT_COLOR_LOOP,
-            color_buckets: Vec::new()
+            color_buckets: Vec::new(),
         };
         mb.update_buckets();
         mb

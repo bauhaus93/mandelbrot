@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 extern crate chrono;
+extern crate env_logger;
 #[macro_use]
 extern crate allegro;
 extern crate allegro_primitives;
