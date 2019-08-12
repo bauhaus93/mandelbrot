@@ -141,22 +141,6 @@ impl Explorer {
     fn handle_keydown(&mut self, key: allegro::KeyCode) {
         const MOVE_PERC: f64 = 0.33;
         match key {
-            allegro::KeyCode::W => {
-                self.mandelbrot.move_center([0., -MOVE_PERC], self.shape);
-                self.needs_update = true;
-            }
-            allegro::KeyCode::A => {
-                self.mandelbrot.move_center([-MOVE_PERC, 0.], self.shape);
-                self.needs_update = true;
-            }
-            allegro::KeyCode::S => {
-                self.mandelbrot.move_center([0., MOVE_PERC], self.shape);
-                self.needs_update = true;
-            }
-            allegro::KeyCode::D => {
-                self.mandelbrot.move_center([MOVE_PERC, 0.], self.shape);
-                self.needs_update = true;
-            }
             allegro::KeyCode::E => {
                 self.mandelbrot.zoom(0.8);
                 self.needs_update = true;
@@ -195,7 +179,7 @@ impl Explorer {
             1 => {
                let center_offset = [ pos[0] - self.shape[0] / 2,
                                      pos[1] - self.shape[1] / 2];
-               self.mandelbrot.move_center_units(center_offset);
+               self.mandelbrot.move_center(center_offset);
                self.needs_update = true;
             },
             _ => {}
