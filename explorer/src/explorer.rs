@@ -16,7 +16,6 @@ pub struct Explorer {
     primitives: PrimitivesAddon,
     display: Display,
     core: Core,
-    color_count: usize,
 }
 
 impl Explorer {
@@ -91,8 +90,7 @@ impl Explorer {
         }
         event_queue.register_event_source(update_timer.get_event_source());
 
-        let mut mandelbrot = Mandelbrot::default();
-        mandelbrot.randomize_continuos_color(100);
+        let mandelbrot = Mandelbrot::default();
         let app = Self {
             stop: false,
             needs_update: true,
@@ -103,7 +101,6 @@ impl Explorer {
             primitives: primitives_addon,
             display: display,
             core: core,
-            color_count: 100,
         };
         Ok(app)
     }
@@ -139,14 +136,13 @@ impl Explorer {
     }
 
     fn handle_keydown(&mut self, key: allegro::KeyCode) {
-        const MOVE_PERC: f64 = 0.33;
         match key {
             allegro::KeyCode::E => {
                 self.mandelbrot.zoom(0.8);
                 self.needs_update = true;
             }
             allegro::KeyCode::R => {
-                self.mandelbrot.mod_depth(5);
+                self.mandelbrot.mod_depth(25);
                 self.needs_update = true;
             }
             allegro::KeyCode::F1 => {
@@ -162,8 +158,21 @@ impl Explorer {
                 }
             }
             allegro::KeyCode::F2 => {
-                self.mandelbrot
-                    .randomize_continuos_color_ranged(self.color_count);
+                info!("Starting zoomed sequence...");
+                match self
+                    .mandelbrot
+                    .snapshot_sequence_zoomed(1000, [800, 600], 0.99, "seq_")
+                {
+                    Ok(_) => info!("Finished zoomed sequence"),
+                    Err(e) => error!("Zoomed sequence: {}", e),
+                }
+            },
+            allegro::KeyCode::F3 => {
+                self.mandelbrot.randomize_start_color();
+                self.needs_update = true;
+            },
+            allegro::KeyCode::F4 => {
+                self.mandelbrot.set_step_default();
                 self.needs_update = true;
             }
             allegro::KeyCode::Escape => {
@@ -177,11 +186,10 @@ impl Explorer {
         info!("pos = {}/{}, button = {}", pos[0], pos[1], button);
         match button {
             1 => {
-               let center_offset = [ pos[0] - self.shape[0] / 2,
-                                     pos[1] - self.shape[1] / 2];
-               self.mandelbrot.move_center(center_offset);
-               self.needs_update = true;
-            },
+                let center_offset = [pos[0] - self.shape[0] / 2, pos[1] - self.shape[1] / 2];
+                self.mandelbrot.move_center(center_offset);
+                self.needs_update = true;
+            }
             _ => {}
         }
     }

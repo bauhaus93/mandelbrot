@@ -1,20 +1,25 @@
+use histogram::Histogram;
+use num::Complex;
 use palette;
 use palette::Pixel;
-use num::Complex;
-use rayon::iter::{ ParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator };
-use histogram::Histogram;
+use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 
-use crate::{ MandelbrotError, ColorBucket, snapshot };
+use crate::{snapshot, ColorBucket, MandelbrotError};
+
+const DEFAULT_STEP: f64 = 1. / 800.;
+const DEFAULT_COLOR_LOOP: i32 = 100;
+// const DEFAULT_POS: [f64; 2] = [0.4379242413594627, -0.3418920843381163];
+const DEFAULT_POS: [f64; 2] = [0.41825764120184555, -0.34087020355542164];
 
 pub struct Mandelbrot {
     step_size: f64,
     center: [f64; 2],
     depth: u32,
-    color_buckets: Vec<ColorBucket>
+    color_loop_depth: i32,
+    color_buckets: Vec<ColorBucket>,
 }
 
 impl Mandelbrot {
-
     pub fn set_center(&mut self, new_center: [f64; 2]) {
         self.center = new_center;
     }
@@ -27,17 +32,22 @@ impl Mandelbrot {
     pub fn set_step_size(&mut self, value: f64) {
         self.step_size = value;
     }
-    
+
+    pub fn set_step_default(&mut self) {
+        self.step_size = DEFAULT_STEP;
+    }
+
     pub fn zoom(&mut self, factor: f64) {
         self.step_size *= factor;
     }
 
     pub fn set_depth(&mut self, value: u32) {
         self.depth = value;
+        self.update_buckets();
     }
 
     pub fn mod_depth(&mut self, value: u32) {
-        self.depth += value;
+        self.set_depth(self.get_depth() + value);
     }
 
     pub fn get_center(&self) -> [f64; 2] {
@@ -50,44 +60,29 @@ impl Mandelbrot {
         self.depth
     }
 
-    pub fn randomize_continuos_color(&mut self, bucket_count: usize) {
-        let count = usize::min(bucket_count, self.depth as usize);
-        self.color_buckets = ColorBucket::create_random_continuos_list(count);
-    }
-
-    pub fn randomize_continuos_color_ranged(&mut self, bucket_count: usize) {
-        let count = usize::min(bucket_count, self.depth as usize);
-        self.color_buckets = ColorBucket::create_random_continuos_list_ranged(count);
-    }
-
-    pub fn randomize_color(&mut self, bucket_count: usize) {
-        let count = usize::min(bucket_count, self.depth as usize);
-        self.color_buckets = ColorBucket::create_random_list(count);
-    }
-
-    pub fn randomize_color_alternating(&mut self, color_count: usize) {
-        self.color_buckets = ColorBucket::create_random_alternating_list(self.depth as usize, color_count);
+    pub fn randomize_start_color(&mut self) {
+        self.color_buckets.clear();
+        self.color_buckets.push(ColorBucket::random_bucket());
+        self.update_buckets();
     }
 
     pub fn print_stats(&self) {
-        info!("center = {} + j{}, step size = {}, depth = {}",
-            self.center[0],
-            self.center[1],
-            self.step_size,
-            self.depth);
+        info!(
+            "center = {} + j{}, step size = {}, depth = {}",
+            self.center[0], self.center[1], self.step_size, self.depth
+        );
     }
 
-    pub fn estimate_entropy(&self, shape: [i32;2]) -> f32 {
+    pub fn estimate_entropy(&self, shape: [i32; 2]) -> f32 {
         const EST_SIZE: i32 = 10;
         let mut histogram = Histogram::new();
         for y in -EST_SIZE / 2..EST_SIZE / 2 {
             for x in -EST_SIZE / 2..EST_SIZE / 2 {
-                let local_point = [x * shape[0] / EST_SIZE,
-                                   y * shape[1] / EST_SIZE];
+                let local_point = [x * shape[0] / EST_SIZE, y * shape[1] / EST_SIZE];
                 let abs_point = self.pixel_to_absolute(local_point);
                 match check_mandelbrot(&abs_point, self.depth) {
                     Some(v) => histogram.increment(v as u64 + 1).unwrap(),
-                    None => histogram.increment(0).unwrap()
+                    None => histogram.increment(0).unwrap(),
                 }
             }
         }
@@ -103,19 +98,38 @@ impl Mandelbrot {
         -entropy
     }
 
-    pub fn snapshot(&self, file_name: &str, shape: [i32; 2]) -> Result<(), MandelbrotError> {
+    pub fn snapshot(&mut self, file_name: &str, shape: [i32; 2]) -> Result<(), MandelbrotError> {
         let pixels = self.create_pixels(shape);
         snapshot(&pixels, shape, file_name)
     }
 
+    pub fn snapshot_sequence_zoomed(
+        &mut self,
+        count: usize,
+        shape: [i32; 2],
+        zoom_factor: f64,
+        file_prefix: &str,
+    ) -> Result<(), MandelbrotError> {
+        for i in 0..count {
+            let file_name = format!("{}{:06}", file_prefix, i);
+            self.snapshot(&file_name, shape)?;
+            self.zoom(zoom_factor);
+            if (i + 1) % 10 == 0 {
+                info!("Sequence progress: {}/{}", i + 1, count);
+            }
+        }
+        Ok(())
+    }
+
     pub fn create_pixel_triplets(&self, shape: [i32; 2]) -> Vec<[u8; 3]> {
-       let values = self.create_values(shape);
-        values.par_iter()
+        let values = self.create_values(shape);
+        values
+            .par_iter()
             .map(|v| colorize(*v, &self.color_buckets))
             .collect()
     }
 
-    pub fn create_pixels(&self, shape: [i32; 2]) -> Vec<u8> {
+    pub fn create_pixels(&mut self, shape: [i32; 2]) -> Vec<u8> {
         let values = self.create_values(shape);
         let mut pixels = Vec::new();
         for v in values.iter() {
@@ -126,8 +140,10 @@ impl Mandelbrot {
     }
 
     fn pixel_to_absolute(&self, point: [i32; 2]) -> [f64; 2] {
-        [self.center[0] + self.step_size * point[0] as f64,
-         self.center[1] + self.step_size * point[1] as f64]
+        [
+            self.center[0] + self.step_size * point[0] as f64,
+            self.center[1] + self.step_size * point[1] as f64,
+        ]
     }
 
     fn create_values(&self, shape: [i32; 2]) -> Vec<Option<u32>> {
@@ -135,42 +151,32 @@ impl Mandelbrot {
         for y in -shape[1] / 2..shape[1] / 2 {
             for x in -shape[0] / 2..shape[0] / 2 {
                 let abs_point = self.pixel_to_absolute([x, y]);
-                points.push(abs_point); 
+                points.push(abs_point);
             }
         }
-        let mut values: Vec<Option<u32>> = points.par_iter()
+        let values: Vec<Option<u32>> = points
+            .par_iter()
             .map(|p| check_mandelbrot(p, self.depth))
             .collect();
-        let min = values.iter().fold(u32::max_value(), |curr_min, v| match v {
-                Some(n) => u32::min(curr_min, *n),
-                None => curr_min
-        });
-
-        let max = values.iter().fold(u32::min_value(), |curr_max, v| match v {
-                Some(n) => u32::max(curr_max, *n),
-                None => curr_max
-        });
-        let bucket_modifier = if min == max {
-            1
-        } else {
-            u32::max(1, (max - min) / u32::min(self.color_buckets.len() as u32, self.depth))
-        };
-        values.par_iter_mut()
-            .for_each(|v| match v {
-                Some(v) => *v =  (*v / bucket_modifier) % self.color_buckets.len() as u32,
-                None => {}
-            });
         values
     }
 
+    fn update_buckets(&mut self) {
+        for _ in self.color_buckets.len()..self.depth as usize {
+            let next_bucket = match self.color_buckets.last() {
+                Some(b) => b.next_bucket(self.color_loop_depth),
+                None => ColorBucket::random_bucket(),
+            };
+            self.color_buckets.push(next_bucket);
+        }
+        debug!("ColorBuckets: {}", self.color_buckets.len());
+    }
 }
 
 fn colorize(value: Option<u32>, color_buckets: &[ColorBucket]) -> [u8; 3] {
     match value {
-        Some(v) => {
-            color_buckets[v as usize].get_color()
-        },
-        None => [0, 0, 0]
+        Some(v) => color_buckets[v as usize].get_color(),
+        None => [0, 0, 0],
     }
 }
 
@@ -186,14 +192,16 @@ fn check_mandelbrot(point: &[f64; 2], max_depth: u32) -> Option<u32> {
     None
 }
 
-
 impl Default for Mandelbrot {
     fn default() -> Self {
-        Self {
-            step_size: 1. / 800.,
-            center: [0.5, 0.],
-            depth: 255,
-            color_buckets: ColorBucket::create_continuos_list(0., (0., 1.), 255)
-        }
+        let mut mb = Self {
+            step_size: DEFAULT_STEP,
+            center: DEFAULT_POS,
+            depth: 400,
+            color_loop_depth: DEFAULT_COLOR_LOOP,
+            color_buckets: Vec::new()
+        };
+        mb.update_buckets();
+        mb
     }
 }
